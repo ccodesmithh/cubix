@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>CubiX Flow</title>
+    <script src="CSInterface.js"></script>
+    <script src="main.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="splash-active">
+    <div id="splashScreen">
+        <video id="splashVideo" src="assets/splash_video.mp4" autoplay muted playsinline></video>
+    </div>
+    <div class="panel">
+        <div class="header">
+            <div class="logo">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#3a8dde" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M2 17L12 22L22 17" stroke="#3a8dde" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M2 12L12 17L22 12" stroke="#3a8dde" stroke-width="2" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <h3>Pasific CubiX</h3>
+            <span class="badge">v0.9 BETA</span>
+        </div>
+
+        <!-- Curve Editor Canvas -->
+        <div class="canvas-container">
+            <div class="canvas-wrapper">
+                <canvas id="curveCanvas"></canvas>
+            </div>
+            <div class="speed-canvas-wrapper">
+                <canvas id="speedCanvas"></canvas>
+            </div>
+        </div>
+
+        <!-- Keyframe Handles Info -->
+        <div class="handles-panel">
+            <div class="handle-row">
+                <div class="handle-group">
+                    <span class="handle-label in-label">OUT</span>
+                    <div class="handle-fields">
+                        <div class="field">
+                            <label>Spd</label>
+                            <input type="number" class="handle-input" id="inputSpeedIn" value="0.00" step="0.1">
+                        </div>
+                        <div class="field">
+                            <label>Inf</label>
+                            <div class="input-suffix">
+                                <input type="number" class="handle-input" id="inputInfluenceIn" value="33.0" step="1" min="0.1" max="100">
+                                <span class="suffix">%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="handle-divider"></div>
+                <div class="handle-group">
+                    <span class="handle-label out-label">IN</span>
+                    <div class="handle-fields">
+                        <div class="field">
+                            <label>Spd</label>
+                            <input type="number" class="handle-input" id="inputSpeedOut" value="0.00" step="0.1">
+                        </div>
+                        <div class="field">
+                            <label>Inf</label>
+                            <div class="input-suffix">
+                                <input type="number" class="handle-input" id="inputInfluenceOut" value="33.0" step="1" min="0.1" max="100">
+                                <span class="suffix">%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Presets Section -->
+        <div class="presets-section">
+            <div class="section-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+                Presets
+            </div>
+            <div class="presets-grid" id="presetsGrid">
+                <button class="preset-btn active" data-preset="easeInOut">
+                    <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M4 28 C14 28, 18 4, 28 4"/>
+                    </svg>
+                    <span>Ease</span>
+                </button>
+                <button class="preset-btn" data-preset="linear">
+                    <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="4" y1="28" x2="28" y2="4"/>
+                    </svg>
+                    <span>Linear</span>
+                </button>
+                <button class="preset-btn" data-preset="easeIn">
+                    <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M4 28 L14 18 Q24 4, 28 4"/>
+                    </svg>
+                    <span>Ease In</span>
+                </button>
+                <button class="preset-btn" data-preset="easeOut">
+                    <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M4 28 Q8 28, 18 14 L28 4"/>
+                    </svg>
+                    <span>Ease Out</span>
+                </button>
+                <button class="preset-btn" data-preset="hold">
+                    <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M4 28 C14 28, 18 28, 28 28 L28 4"/>
+                    </svg>
+                    <span>Hold</span>
+                </button>
+                <button class="preset-btn" data-preset="bounce">
+                    <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M4 28 Q6 4, 12 4 L28 4"/>
+                    </svg>
+                    <span>Bounce</span>
+                </button>
+                <button class="preset-btn" data-preset="elastic">
+                    <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M4 28 C26 34, 6 -2, 28 4"/>
+                    </svg>
+                    <span>Elastic</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Keyframe Type Selector -->
+        <div class="keyframe-section">
+            <div class="section-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+                Keyframe Type
+            </div>
+            <div class="keyframe-types">
+                <button class="keyframe-btn active" data-type="keyframe">
+                    <span class="kf-icon"></span>
+                    Bezier
+                </button>
+                <button class="keyframe-btn" data-type="roving">
+                    <span class="kf-icon roving"></span>
+                    Roving
+                </button>
+                <button class="keyframe-btn" data-type="linear">
+                    <span class="kf-icon linear"></span>
+                    Linear
+                </button>
+            </div>
+        </div>
+
+        <!-- Apply Button -->
+        <button class="apply-btn" onclick="applyEase()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Apply Ease
+        </button>
+
+        <!-- Status -->
+        <div class="status-bar">
+            <span id="statusText">Ready</span>
+            <span class="section-title">Programmed by Yudha Prasetiya</span>
+            <span class="shortcut">⌘Z Undo</span>
+        </div>
+    </div>
+</body>
+</html>
