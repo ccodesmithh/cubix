@@ -1,7 +1,7 @@
 // CubiX Flow - After Effects Script
 // Keyframe ease application matching AE's built-in curve editor
 
-function applyEase(x1, y1, x2, y2, keyframeType) {
+function applyEase(x1, y1, x2, y2, keyframeType, applyContinuity) {
     var comp = app.project.activeItem;
 
     if (!(comp instanceof CompItem)) {
@@ -18,6 +18,7 @@ function applyEase(x1, y1, x2, y2, keyframeType) {
 
     var totalKeysAffected = 0;
     var errors = [];
+    var keyPairs = []; // Track all key pairs for continuity blending
 
     for (var i = 0; i < selectedProps.length; i++) {
         var prop = selectedProps[i];
@@ -37,6 +38,7 @@ function applyEase(x1, y1, x2, y2, keyframeType) {
                 try {
                     applyEaseToKeyPair(prop, k, k + 1, x1, y1, x2, y2, keyframeType);
                     totalKeysAffected++;
+                    keyPairs.push({prop: prop, key1: k, key2: k + 1});
                 } catch (e) {
                     errors.push("Key " + k + "-" + (k+1) + ": " + e.toString());
                 }
@@ -50,10 +52,20 @@ function applyEase(x1, y1, x2, y2, keyframeType) {
                 try {
                     applyEaseToKeyPair(prop, key1, key2, x1, y1, x2, y2, keyframeType);
                     totalKeysAffected++;
+                    keyPairs.push({prop: prop, key1: key1, key2: key2});
                 } catch (e) {
                     errors.push("Key " + key1 + "-" + key2 + ": " + e.toString());
                 }
             }
+        }
+    }
+
+    // Apply continuity blending if enabled
+    if (applyContinuity && keyPairs.length > 1) {
+        try {
+            blendConsecutiveKeyframes(keyPairs);
+        } catch (e) {
+            errors.push("Blending error: " + e.toString());
         }
     }
 
@@ -66,6 +78,240 @@ function applyEase(x1, y1, x2, y2, keyframeType) {
     }
 
     return JSON.stringify({ success: true, keysAffected: totalKeysAffected });
+}
+
+function blendConsecutiveKeyframes(keyPairs) {
+    // Flow plugin-inspired blending algorithm:
+    // 1. Build metadata for each pair (slopes, speeds, values)
+    // 2. Blend slopes at middle keyframes
+    // 3. Recalculate speeds from blended slopes
+    // 4. Reapply to affected keyframes
+
+    // Collect all pair data
+    var pairsData = [];
+
+    for (var i = 0; i < keyPairs.length; i++) {
+        var pair = keyPairs[i];
+        var prop = pair.prop;
+        var key1 = pair.key1;
+        var key2 = pair.key2;
+
+        try {
+            var t1 = prop.keyTime(key1);
+            var t2 = prop.keyTime(key2);
+            var timeDelta = t2 - t1;
+            if (timeDelta <= 0) continue;
+
+            var v1 = prop.keyValue(key1);
+            var v2 = prop.keyValue(key2);
+
+            var isArray = (v1 instanceof Array);
+            var numDims = isArray ? v1.length : 1;
+
+            var pairData = {
+                pair: pair,
+                prop: prop,
+                key1: key1,
+                key2: key2,
+                timeDelta: timeDelta,
+                v1: v1,
+                v2: v2,
+                isArray: isArray,
+                numDims: numDims,
+                easeOut: [],
+                easeIn: [],
+                slopesOut: [],
+                slopesIn: [],
+                avSpeeds: [],
+                valueDelta: []
+            };
+
+            // Read available eases
+            try {
+                pairData.easeOut = prop.keyOutTemporalEase(key1);
+                pairData.easeIn = prop.keyInTemporalEase(key2);
+            } catch (e) {
+                pairData.easeOut = [];
+                pairData.easeIn = [];
+            }
+
+            // Calculate slopes and average speeds per dimension
+            for (var d = 0; d < numDims; d++) {
+                var val1 = isArray ? v1[d] : v1;
+                var val2 = isArray ? v2[d] : v2;
+                var vDelta = val2 - val1;
+                vDelta = isArray ? vDelta : Math.abs(vDelta);
+                
+                var avSpeed = Math.abs(vDelta) / timeDelta;
+                pairData.valueDelta[d] = vDelta;
+                pairData.avSpeeds[d] = avSpeed;
+
+                var speedOut = 0, speedIn = 0;
+                if (pairData.easeOut && d < pairData.easeOut.length) {
+                    speedOut = pairData.easeOut[d].speed;
+                }
+                if (pairData.easeIn && d < pairData.easeIn.length) {
+                    speedIn = pairData.easeIn[d].speed;
+                }
+
+                // Calculate slopes: slope = speed / averageSpeed
+                var slopeOut = (avSpeed > 0.001) ? (speedOut / avSpeed) : 0;
+                var slopeIn = (avSpeed > 0.001) ? (speedIn / avSpeed) : 0;
+
+                // Preserve sign for negative value deltas
+                if (vDelta < 0) {
+                    slopeOut = -slopeOut;
+                    slopeIn = -slopeIn;
+                }
+
+                pairData.slopesOut[d] = slopeOut;
+                pairData.slopesIn[d] = slopeIn;
+            }
+
+            pairsData.push(pairData);
+        } catch (e) {
+            // Skip on error
+        }
+    }
+
+    // Blend consecutive pairs using Flow algorithm
+    for (var j = 0; j < pairsData.length - 1; j++) {
+        var cur = pairsData[j];
+        var nxt = pairsData[j + 1];
+
+        // Must be same property and consecutive
+        if (cur.prop !== nxt.prop) continue;
+        if (cur.key2 !== nxt.key1) continue;
+
+        try {
+            var len = Math.min(cur.numDims, nxt.numDims);
+            len = Math.min(len, 3); // Limit to 3D
+
+            for (var d = 0; d < len; d++) {
+                // Calculate average slope at middle keyframe
+                var avgSlope = (cur.slopesOut[d] + nxt.slopesIn[d]) / 2;
+
+                // Recalculate speeds from blended slope
+                var newSpeedOut = avgSlope * cur.avSpeeds[d];
+                var newSpeedIn = avgSlope * nxt.avSpeeds[d];
+
+                // Apply sign preservation
+                if (cur.valueDelta[d] < 0) newSpeedOut = -newSpeedOut;
+                if (nxt.valueDelta[d] < 0) newSpeedIn = -newSpeedIn;
+
+                // Blend influences: use maximum to preserve timing
+                var maxInf = Math.max(
+                    (cur.easeOut && d < cur.easeOut.length) ? cur.easeOut[d].influence : 0,
+                    (nxt.easeIn && d < nxt.easeIn.length) ? nxt.easeIn[d].influence : 0
+                );
+
+                // Update ease values in-place
+                if (cur.easeOut && d < cur.easeOut.length) {
+                    cur.easeOut[d].speed = newSpeedOut;
+                    cur.easeOut[d].influence = maxInf;
+                }
+                if (nxt.easeIn && d < nxt.easeIn.length) {
+                    nxt.easeIn[d].speed = newSpeedIn;
+                    nxt.easeIn[d].influence = maxInf;
+                }
+
+                // Update slopes for next iteration
+                cur.slopesOut[d] = avgSlope;
+                nxt.slopesIn[d] = avgSlope;
+            }
+        } catch (e) {
+            // Continue on error
+        }
+    }
+
+    // Reapply all modified eases
+    for (var i = 0; i < pairsData.length; i++) {
+        var pd = pairsData[i];
+        try {
+            if (pd.easeOut && pd.easeOut.length > 0) {
+                var inEase1 = pd.prop.keyInTemporalEase(pd.key1);
+                pd.prop.setTemporalEaseAtKey(pd.key1, inEase1, pd.easeOut);
+            }
+            if (pd.easeIn && pd.easeIn.length > 0) {
+                var outEase2 = pd.prop.keyOutTemporalEase(pd.key2);
+                pd.prop.setTemporalEaseAtKey(pd.key2, pd.easeIn, outEase2);
+            }
+        } catch (e) {
+            // Continue on error
+        }
+    }
+}
+
+function readFirstKeyframeEase() {
+    var comp = app.project.activeItem;
+
+    if (!(comp instanceof CompItem)) {
+        return JSON.stringify({ error: "No composition selected." });
+    }
+
+    var selectedProps = comp.selectedProperties;
+
+    if (selectedProps.length === 0) {
+        return JSON.stringify({ error: "No property selected." });
+    }
+
+    var prop = selectedProps[0];
+
+    if (!prop.isTimeVarying || prop.numKeys < 2) {
+        return JSON.stringify({ error: "Property has no keyframes." });
+    }
+
+    var selectedKeys = prop.selectedKeys;
+
+    if (selectedKeys.length < 2) {
+        return JSON.stringify({ error: "Please select at least 2 keyframes." });
+    }
+
+    var key1 = selectedKeys[0];
+    var key2 = selectedKeys[1];
+
+    var t1 = prop.keyTime(key1);
+    var t2 = prop.keyTime(key2);
+    var timeDelta = t2 - t1;
+
+    if (timeDelta <= 0) {
+        return JSON.stringify({ error: "Invalid keyframe time." });
+    }
+
+    var v1 = prop.keyValue(key1);
+    var v2 = prop.keyValue(key2);
+
+    // Get outgoing ease from key1
+    var outEase = prop.keyOutTemporalEase(key1);
+
+    // Get incoming ease from key2
+    var inEase = prop.keyInTemporalEase(key2);
+
+    if (!outEase || !inEase || outEase.length === 0 || inEase.length === 0) {
+        return JSON.stringify({ error: "No ease values found on selected keyframes." });
+    }
+
+    // Extract speed and influence from the first dimension
+    var speedOut = outEase[0].speed;
+    var influenceOut = outEase[0].influence;
+    var speedIn = inEase[0].speed;
+    var influenceIn = inEase[0].influence;
+
+    // Check if spatial property to get average speed
+    var isSpatial = false;
+    try {
+        if (prop.propertyValueType === PropertyValueType.TwoD_SPATIAL || 
+            prop.propertyValueType === PropertyValueType.ThreeD_SPATIAL) {
+            isSpatial = true;
+        }
+    } catch(e) {}
+
+    return JSON.stringify({
+        speedOut: speedOut,
+        influenceOut: influenceOut,
+        speedIn: speedIn,
+        influenceIn: influenceIn
+    });
 }
 
 function applyEaseToKeyPair(prop, key1, key2, x1, y1, x2, y2, keyframeType) {

@@ -39,18 +39,18 @@ const presets = {
     },
     easeIn: {
         name: 'Ease In',
-        p1: { x: 0.33, y: 0.33 },
+        p1: { x: 0.42, y: 0.42 },
         p2: { x: 0.67, y: 1 }
     },
     easeOut: {
         name: 'Ease Out',
         p1: { x: 0.33, y: 0 },
-        p2: { x: 0.67, y: 0.67 }
+        p2: { x: 0.58, y: 0.58 }
     },
     easeInOut: {
         name: 'Ease',
-        p1: { x: 0.33, y: 0 },
-        p2: { x: 0.67, y: 1 }
+        p1: { x: 0.42, y: 0 },
+        p2: { x: 0.58, y: 1 }
     },
     hold: {
         name: 'Hold',
@@ -59,14 +59,14 @@ const presets = {
     },
     bounce: {
         name: 'Bounce',
-        p1: { x: 0.17, y: 0.88 }, // Adjusted to create an overshoot
-        p2: { x: 0.28, y: 1.25 }, // Adjusted to create an overshoot
+        p1: { x: 0.15, y: 1.15 },
+        p2: { x: 0.30, y: 1.08 },
         custom: true
     },
     elastic: {
         name: 'Elastic',
-        p1: { x: 0.68, y: -0.55 },
-        p2: { x: 0.27, y: 1.55 },
+        p1: { x: 0.25, y: -0.60 },
+        p2: { x: 0.75, y: 1.60 },
         custom: true
     }
 };
@@ -153,6 +153,9 @@ window.onload = function() {
     // Editable input fields
     setupEditableInputs();
 
+    // Keyboard shortcuts
+    setupKeyboardShortcuts();
+
     // Responsive canvases
     resizeCanvases();
     window.addEventListener('resize', resizeCanvases);
@@ -177,6 +180,17 @@ function setupEditableInputs() {
                 e.target.blur();
             }
         });
+    });
+}
+
+// ─── Keyboard Shortcuts ──────────────────────────────────────────
+function setupKeyboardShortcuts() {
+    document.addEventListener('keydown', function(e) {
+        // Cmd+R (Mac) or Ctrl+R (Windows) to sync handles
+        if ((e.metaKey || e.ctrlKey) && e.key === 'r') {
+            e.preventDefault();
+            syncHandles();
+        }
     });
 }
 
@@ -713,10 +727,12 @@ function applyEase() {
         return;
     }
 
-    updateStatus('Applying...');
+    var continuity = document.getElementById('continuityToggle').checked;
+    var blendMsg = continuity ? ' (with blending)' : '';
+    updateStatus('Applying' + blendMsg + '...');
     document.querySelector('.apply-btn').disabled = true;
 
-    var script = 'applyEase(' + p1.x + ', ' + p1.y + ', ' + p2.x + ', ' + p2.y + ', "' + selectedKeyframeType + '")';
+    var script = 'applyEase(' + p1.x + ', ' + p1.y + ', ' + p2.x + ', ' + p2.y + ', "' + selectedKeyframeType + '", ' + continuity + ')';
     cs.evalScript(script, function(result) {
         document.querySelector('.apply-btn').disabled = false;
 
@@ -731,8 +747,9 @@ function applyEase() {
             if (res.error) {
                 updateStatus('Error: ' + res.error);
             } else if (res.success) {
-                updateStatus('Applied to ' + (res.keysAffected || '') + ' keyframe pair(s)!');
-                setTimeout(function() { updateStatus('Ready'); }, 2500);
+                var pairing = res.keysAffected === 1 ? 'pair' : 'pairs';
+                updateStatus('Applied to ' + (res.keysAffected || 0) + ' keyframe ' + pairing + blendMsg);
+                setTimeout(function() { updateStatus('Ready'); }, 3000);
             } else {
                 updateStatus('Done.');
             }
@@ -740,9 +757,54 @@ function applyEase() {
             if (result.indexOf('error') !== -1) {
                 updateStatus('Error: ' + result);
             } else {
-                updateStatus('Applied');
+                updateStatus('Applied' + blendMsg);
                 setTimeout(function() { updateStatus('Ready'); }, 2000);
             }
+        }
+    });
+}
+
+// ─── Sync Handles from After Effects ─────────────────────────────
+function syncHandles() {
+    if (!cs || typeof cs.evalScript !== 'function') {
+        updateStatus('Cannot sync — host not connected.');
+        return;
+    }
+
+    updateStatus('Reading ease values...');
+    
+    var script = 'readFirstKeyframeEase()';
+    cs.evalScript(script, function(result) {
+        if (!result) {
+            updateStatus('No keyframes selected for reading.');
+            return;
+        }
+
+        try {
+            var easeData = JSON.parse(result);
+            if (easeData.error) {
+                updateStatus('Error: ' + easeData.error);
+                return;
+            }
+
+            // Update p1 and p2 from the ease data
+            if (easeData.speedOut !== undefined && easeData.influenceOut !== undefined) {
+                p1.x = Math.max(easeData.influenceOut / 100, 0.01);
+                p1.y = easeData.speedOut * p1.x;
+            }
+
+            if (easeData.speedIn !== undefined && easeData.influenceIn !== undefined) {
+                p2.x = 1 - Math.max(easeData.influenceIn / 100, 0.01);
+                p2.y = 1 - easeData.speedIn * (1 - p2.x);
+            }
+
+            selectedPreset = null;
+            document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
+            draw();
+            updateStatus('Synced from keyframe ease values.');
+            setTimeout(function() { updateStatus('Ready'); }, 1500);
+        } catch (e) {
+            updateStatus('Error parsing ease data: ' + e.message);
         }
     });
 }
@@ -755,3 +817,4 @@ function updateStatus(text) {
 window.selectPreset = selectPreset;
 window.selectKeyframeType = selectKeyframeType;
 window.applyEase = applyEase;
+window.syncHandles = syncHandles;

@@ -35,20 +35,20 @@
             </div>
         </div>
 
-        <!-- Keyframe Handles Info -->
+        <!-- Handles Panel -->
         <div class="handles-panel">
             <div class="handle-row">
                 <div class="handle-group">
-                    <span class="handle-label in-label">OUT</span>
+                    <span class="handle-label in-label" title="Outgoing ease at the first keyframe">OUT</span>
                     <div class="handle-fields">
                         <div class="field">
-                            <label>Spd</label>
-                            <input type="number" class="handle-input" id="inputSpeedIn" value="0.00" step="0.1">
+                            <label title="Speed/Slope">Spd</label>
+                            <input type="number" class="handle-input" id="inputSpeedIn" value="0.00" step="0.1" title="Easing speed at outgoing handle">
                         </div>
                         <div class="field">
-                            <label>Inf</label>
+                            <label title="Influence distance">Inf</label>
                             <div class="input-suffix">
-                                <input type="number" class="handle-input" id="inputInfluenceIn" value="33.0" step="1" min="0.1" max="100">
+                                <input type="number" class="handle-input" id="inputInfluenceIn" value="33.0" step="1" min="0.1" max="100" title="Time influence of outgoing handle">
                                 <span class="suffix">%</span>
                             </div>
                         </div>
@@ -56,22 +56,39 @@
                 </div>
                 <div class="handle-divider"></div>
                 <div class="handle-group">
-                    <span class="handle-label out-label">IN</span>
+                    <span class="handle-label out-label" title="Incoming ease at the second keyframe">IN</span>
                     <div class="handle-fields">
                         <div class="field">
-                            <label>Spd</label>
-                            <input type="number" class="handle-input" id="inputSpeedOut" value="0.00" step="0.1">
+                            <label title="Speed/Slope">Spd</label>
+                            <input type="number" class="handle-input" id="inputSpeedOut" value="0.00" step="0.1" title="Easing speed at incoming handle">
                         </div>
                         <div class="field">
-                            <label>Inf</label>
+                            <label title="Influence distance">Inf</label>
                             <div class="input-suffix">
-                                <input type="number" class="handle-input" id="inputInfluenceOut" value="33.0" step="1" min="0.1" max="100">
+                                <input type="number" class="handle-input" id="inputInfluenceOut" value="33.0" step="1" min="0.1" max="100" title="Time influence of incoming handle">
                                 <span class="suffix">%</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- Apply Button + options -->
+        <div class="apply-row">
+            <button class="apply-btn" onclick="applyEase()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                Apply Ease
+            </button>
+            <label class="continuity-label" title="Blend adjacent keyframe eases for smooth transitions (like Flow plugin)">
+                <input type="checkbox" id="continuityToggle" checked>
+                <span>Blend</span>
+            </label>
+            <button class="sync-btn" onclick="syncHandles()" title="Read ease values from the first selected key pair (Cmd+R)">
+                ↻
+            </button>
         </div>
 
         <!-- Presets Section -->
@@ -155,19 +172,11 @@
             </div>
         </div>
 
-        <!-- Apply Button -->
-        <button class="apply-btn" onclick="applyEase()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-            Apply Ease
-        </button>
-
         <!-- Status -->
         <div class="status-bar">
             <span id="statusText">Ready</span>
             <span class="section-title">Programmed by Yudha Prasetiya</span>
-            <span class="shortcut">⌘Z Undo</span>
+            <span class="shortcut">⌘Z Undo • ⌘R Sync</span>
         </div>
     </div>
 </body>
